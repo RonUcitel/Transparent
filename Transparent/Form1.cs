@@ -12,25 +12,57 @@ namespace Transparent
 {
     public partial class Form1 : Form
     {
-        Timer t = new Timer();
         public Form1()
         {
             InitializeComponent();
+            Focus();
             if (BackgroundImage == null)
             {
                 BackColor = Color.Red;
             }
-            t.Interval = 1000;
-            t.Tick += T_Tick;
-            t.Start();
-            
-            //pictureBox1.Image = MakeTransparent(pictureBox1);
+            //MakeTransparent2(pictureBox1, this);
+            MakeTransparent2(button1, this);
         }
 
-        private void T_Tick(object sender, EventArgs e)
+        public void MakeTransparent2(Control c, Form f)
         {
-            this.BackgroundImage = MakeTransparent(this);
-            //pictureBox1.BackgroundImage = MakeTransparent(pictureBox1);
+            Bitmap output = new Bitmap(f.ClientSize.Width, f.ClientSize.Height);
+            using (Graphics g = Graphics.FromImage(output))
+            {
+                g.Clear(f.BackColor);
+                using (Bitmap full_back = new Bitmap(f.Width, f.Height))
+                {
+                    f.DrawToBitmap(full_back, new Rectangle(0, 0, f.Width, f.Height));
+                    Point toScreen = f.PointToScreen(new Point(0, 0));
+                    Bitmap back = new Bitmap(f.ClientSize.Width, f.ClientSize.Height);
+                    using (Graphics g_back = Graphics.FromImage(back))
+                    {
+                        g_back.DrawImage(full_back, 0, 0, new Rectangle(toScreen.X - f.Left, toScreen.Y - f.Top, f.ClientSize.Width, f.ClientSize.Height), GraphicsUnit.Pixel);
+                    }
+                    g.DrawImage(back, new Point(0, 0));
+                }
+
+            }
+
+            SortedDictionary<int, Control> sd = new SortedDictionary<int, Control>();
+            int min = f.Controls.GetChildIndex(c);
+            foreach (Control item in f.Controls)
+            {
+                if (f.Controls.GetChildIndex(item) > min)
+                {
+                    sd.Add(f.Controls.GetChildIndex(item), item);
+                }
+            }
+            for (int i = sd.Count; i > min; i--)
+            {
+                sd[i].DrawToBitmap(output, new Rectangle(sd[i].Left, sd[i].Top, sd[i].Width, sd[i].Height));
+            }
+
+
+            Rectangle r = c.ClientRectangle;
+            r.Location = new Point(c.Left + 1, c.Top + 1);
+
+            c.BackgroundImage = output.Clone(r, output.PixelFormat);
         }
 
         public Bitmap MakeTransparent(Control c)
@@ -44,12 +76,12 @@ namespace Transparent
 
             if (BackgroundImage != null)//If the form have a BackGoundImage:
             {
-                AddImageAtPlace(output,g, this);//Add it to the output Bitmap.
+                AddImageAtPlace(output, this);//Add it to the output Bitmap.
             }
 
             //Make a list of the Controls on the form and order it by the "z" value of the control(what is on what at the desplay).
-            List<Control> l = Controls.OfType<Control>().ToList();
-            l.Sort((x, y) => Controls.GetChildIndex(x).CompareTo(y));//Use a Lambda Expression to make a Comparison method.
+            //List<Control> l = Controls.OfType<Control>().ToList();
+            //l.Sort((x, y) => Controls.GetChildIndex(x).CompareTo(y));//Use a Lambda Expression to make a Comparison method.
 
             //for (int i = 0; i < l.Count; i++)
             //{
@@ -62,21 +94,26 @@ namespace Transparent
             Rectangle r = c.ClientRectangle;
             if (c != this)
             {
-                r.Location = c.Location;
+                r = new Rectangle(c.Left - 1, c.Top - 1, c.Width - 2, c.Height - 2);
+                //r.Location = /*c.Location*/ new Point();
             }
-            
+
             return output.Clone(r, output.PixelFormat);
         }
 
-        public void AddImageAtPlace(Bitmap back, Graphics g, Control c)
+        public void AddImageAtPlace(Bitmap back, Control c)
         {
-            if (c == this)
+            using (Graphics g = Graphics.FromImage(back))
             {
-                g.DrawImage(GetResizedImage(c), new Point(0, (back.Height - GetResizedImage(c).Height) / 2));
-            }
-            else
-            {
-                g.DrawImage(GetResizedImage(c), new Point(c.Left, (back.Height - GetResizedImage(c).Height) / 2));
+                Bitmap p = GetResizedImage(c);
+                if (c == this)
+                {
+                    g.DrawImage(p, new Point(0, (back.Height - p.Height) / 2));
+                }
+                else
+                {
+                    g.DrawImage(p, new Point(c.Left, (back.Height - p.Height) / 2));
+                }
             }
         }
         public Bitmap GetResizedImage(Control c)
